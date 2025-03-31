@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Route Finder Map</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-MecoVBYNDrUov+t8RAw3o97nLVZp13N6dr7kE7vZGlkEGfZ67V5QW8HaqceMFMp6" crossorigin="anonymous">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+      body {
+        background-color: #f8f9fa;
+      }
+      .container {
+        margin-top: 30px;
+      }
+      #map {
+        height: 600px;
+        width: 100%;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .header {
+        margin-bottom: 30px;
+        text-align: center;
+      }
+      .form-section {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      }
+      .status-message {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <a class="navbar-brand" href="#">Route Finder</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+              aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </nav>
+
+    <div class="container">
+      <!-- Page Header -->
+      <div class="header">
+        <h1 class="display-4">Find Your Best Route</h1>
+        <p class="lead">Plan your journey with our interactive route finder.</p>
+      </div>
+
+      <div class="row">
+        <!-- Input Form Section -->
+        <div class="col-md-6">
+          <div class="form-section">
+            <form method="post">
+              <div class="form-group">
+                <label for="start_lat">Start Latitude</label>
+                <input type="text" class="form-control" id="start_lat" name="start_lat"
+                       placeholder="Enter start latitude" required>
+              </div>
+              <div class="form-group">
+                <label for="start_lon">Start Longitude</label>
+                <input type="text" class="form-control" id="start_lon" name="start_lon"
+                       placeholder="Enter start longitude" required>
+              </div>
+              <div class="form-group">
+                <label for="finish_lat">Finish Latitude</label>
+                <input type="text" class="form-control" id="finish_lat" name="finish_lat"
+                       placeholder="Enter finish latitude" required>
+              </div>
+              <div class="form-group">
+                <label for="finish_lon">Finish Longitude</label>
+                <input type="text" class="form-control" id="finish_lon" name="finish_lon"
+                       placeholder="Enter finish longitude" required>
+              </div>
+              <div class="form-group">
+                <label for="max_length">Maximum Route Length (m)</label>
+                <input type="text" class="form-control" id="max_length" name="max_length"
+                       placeholder="Enter maximum route length in meters" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Find Route</button>
+            </form>
+            {% if status_message %}
+              <div class="alert alert-info status-message" role="alert">
+                {{ status_message }}
+              </div>
+            {% endif %}
+            {% if total_length %}
+              <div class="alert alert-success status-message" role="alert">
+                Total Route Length: {{ total_length|round(1) }} meters
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        <!-- Map Section -->
+        <div class="col-md-6">
+          <div id="map"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS and Dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+            integrity="sha384-DfXd5uUgXFAq2+oRA3kDbW9N1n5OmV0JkZIoERt4g7+2Gk1n6nx9Q91xohkgk+Fw"
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+            integrity="sha384-9/reFTGAW83EW2RDuUBQp+M6Y1b5fsI6Jop3rR1Y7RrwWUWbQ3d29D5SB9ctT8gA"
+            crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+            integrity="sha384-B4gt1jrGC7Jh4Ag79FyjXU7B+3jA+8CZsZk8WnYxN3QK7d5P+Urb02xfwXQwIs6V"
+            crossorigin="anonymous"></script>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+      // Set initial map center using provided start coordinates or default to Paris.
+      var initialLat = {{ start_user[0] if start_user else 48.8566 }};
+      var initialLon = {{ start_user[1] if start_user else 2.3522 }};
+
+      var map = L.map('map').setView([initialLat, initialLon], 13);
+
+      // Add OpenStreetMap tiles.
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      // If route data is available, add it as a red polyline.
+      {% if route_json %}
+        var routeCoords = {{ route_json|tojson }};
+        var routePolyline = L.polyline(routeCoords, {color: 'red', weight: 5}).addTo(map);
+        map.fitBounds(routePolyline.getBounds());
+      {% endif %}
+
+      // Add markers for start and finish if provided.
+      {% if start_user %}
+        L.marker({{ start_user|tojson }}).addTo(map)
+          .bindPopup('Start');
+      {% endif %}
+
+      {% if finish_user %}
+        L.marker({{ finish_user|tojson }}).addTo(map)
+          .bindPopup('Finish');
+      {% endif %}
+
+      // Optional: Get the user's current geolocation and add a marker.
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(function(position) {
+              var userLatLng = [position.coords.latitude, position.coords.longitude];
+              L.marker(userLatLng).addTo(map)
+                  .bindPopup('Your Location')
+                  .openPopup();
+          });
+      }
+    </script>
+  </body>
+</html>
